@@ -39,10 +39,15 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	//File Server endpoints
 	mux.Handle("/app/", apiConfig.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
 	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
 
+	//Non-fileservers
 	mux.HandleFunc("/api/healthz", handlerReadiness)
+	mux.HandleFunc("/api/validate_chirp", handlerValidateChirp)
+
+	//admin endpoints
 	mux.HandleFunc("/admin/metrics", apiConfig.handlerMetrics)
 	mux.HandleFunc("/admin/reset", apiConfig.handlerReset)
 
