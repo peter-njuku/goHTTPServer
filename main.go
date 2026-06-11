@@ -6,21 +6,34 @@ import (
 	"net/http"
 )
 
+func handlerReadiness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
 func main() {
-	port := "8080"
+	const port = "8080"
+	const filePathRoot = "."
+
 	serveMux := http.NewServeMux()
+	serveMux.HandleFunc("/healthz", handlerReadiness)
+	serveMux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot))))
+
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: serveMux,
 	}
 
-	serveMux.Handle("/pages", http.FileServer(http.Dir(".")))
-
-	serveMux.Handle("/", http.FileServer(http.Dir(".")))
-
-	log.Printf("Serving files from root on port %s\n", port)
+	log.Printf("Serving files from app on port %s\n", port)
 	err := server.ListenAndServe()
 	if err != nil {
-		log.Print(err)
+		log.Fatal(err)
 	}
 }
