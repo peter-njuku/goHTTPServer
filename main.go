@@ -36,18 +36,18 @@ func main() {
 
 	apiConfig := &apiConfig{}
 
-	serveMux := http.NewServeMux()
+	mux := http.NewServeMux()
 
-	serveMux.Handle("/app/", apiConfig.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
-	serveMux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
+	mux.Handle("/app/", apiConfig.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
+	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
 
-	serveMux.HandleFunc("/healthz", handlerReadiness)
-	serveMux.HandleFunc("/metrics", apiConfig.handlerMetrics)
-	serveMux.HandleFunc("/reset", apiConfig.handlerReset)
+	mux.HandleFunc("/healthz", handlerReadiness)
+	mux.HandleFunc("/metrics", apiConfig.handlerMetrics)
+	mux.HandleFunc("/reset", apiConfig.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
-		Handler: serveMux,
+		Handler: mux,
 	}
 
 	log.Printf("Serving files from app on port %s\n", port)
