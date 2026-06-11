@@ -1,31 +1,42 @@
 package main
 
 import (
-	//"image"
+	"fmt"
 	"log"
 	"net/http"
+	"sync/atomic"
 )
 
-func handlerReadiness(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
+type apiConfig struct {
+	fileServerHits atomic.Int32
+}
 
-	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileServerHits.Add(1)
+		next.ServeHTTP(w, r)
+	})
+}
 
+func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileServerHits.Load())))
 }
 
 func main() {
 	const port = "8080"
 	const filePathRoot = "."
 
+	apiConfig := &apiConfig{}
+
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc("/healthz", handlerReadiness)
-	serveMux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot))))
+
+	serveMux.Handle("/app/", apiConfig.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
 	serveMux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
+
+	serveMux.HandleFunc("/healthz", handlerReadiness)
+	serveMux.HandleFunc("/metrics", apiConfig.handlerMetrics)
+	serveMux.HandleFunc("/reset", apiConfig.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
