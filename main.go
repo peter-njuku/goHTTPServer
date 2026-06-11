@@ -24,10 +24,11 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Add("Content-Type", "text/html; charset=utf-8")
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Hits: %d", cfg.fileServerHits.Load())
+	s := fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", cfg.fileServerHits.Load())
+	w.Write([]byte(s))
 }
 
 func main() {
@@ -42,8 +43,8 @@ func main() {
 	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
 
 	mux.HandleFunc("/api/healthz", handlerReadiness)
-	mux.HandleFunc("/api/metrics", apiConfig.handlerMetrics)
-	mux.HandleFunc("/api/reset", apiConfig.handlerReset)
+	mux.HandleFunc("/admin/metrics", apiConfig.handlerMetrics)
+	mux.HandleFunc("/admin/reset", apiConfig.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
