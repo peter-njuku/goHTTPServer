@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type chirpRequest struct {
@@ -16,6 +17,10 @@ type chirpResponseValid struct {
 
 type chirpResponseError struct {
 	Error string `json:"error"`
+}
+
+type chirpResponseCleaned struct {
+	CleanedBody string `json:"cleaned_body"`
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -35,6 +40,25 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 	respondWithJSON(w, code, chirpResponseError{Error: msg})
 }
 
+func scrubProfanity(text string) (string, bool) {
+	bannedWords := map[string]bool{
+		"kerfuffle": true,
+		"sharbert":  true,
+		"fornax":    true,
+	}
+
+	words := strings.Split(text, " ")
+	censored := false
+	for i, word := range words {
+		if bannedWords[strings.ToLower(word)] {
+			words[i] = "****"
+			censored = true
+		}
+	}
+
+	return strings.Join(words, " "), censored
+}
+
 func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -52,5 +76,9 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cleaned, censored := scrubProfanity(params.Body); censored {
+		respondWithJSON(w, http.StatusOK, chirpResponseCleaned{CleanedBody: cleaned})
+		return
+	}
 	respondWithJSON(w, http.StatusOK, chirpResponseValid{Valid: true})
 }
