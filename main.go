@@ -19,8 +19,15 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 }
 
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileServerHits.Load())))
+	fmt.Fprintf(w, "Hits: %d", cfg.fileServerHits.Load())
 }
 
 func main() {
