@@ -25,6 +25,7 @@ func main() {
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/healthz", handlerReadiness)
 	serveMux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot))))
+	serveMux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
 
 	server := &http.Server{
 		Addr:    ":" + port,
