@@ -8,7 +8,6 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/peter-njuku/goHTTPServer/internal/config"
 	"github.com/peter-njuku/goHTTPServer/internal/database"
 )
 
@@ -18,6 +17,8 @@ const filePathRoot = "."
 func main() {
 	godotenv.Load()
 	dbUrl := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
+
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -25,8 +26,9 @@ func main() {
 	defer db.Close()
 	dbQueries := database.New(db)
 
-	apiConfig := config.ApiConfig{
-		Db: *dbQueries,
+	apiConfig := ApiConfig{
+		Db:       *dbQueries,
+		Platform: platform,
 	}
 
 	mux := http.NewServeMux()
@@ -37,7 +39,8 @@ func main() {
 
 	//Non-fileservers
 	mux.HandleFunc("/api/healthz", handlerReadiness)
-	mux.HandleFunc("/api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("/api/chirps", apiConfig.handlerValidateChirp)
+	mux.HandleFunc("/api/users", apiConfig.HandlerCreateUser)
 
 	//admin endpoints
 	mux.HandleFunc("/admin/metrics", apiConfig.HandlerMetrics)

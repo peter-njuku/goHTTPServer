@@ -1,4 +1,4 @@
-package config
+package main
 
 import (
 	"log"
@@ -12,9 +12,20 @@ func (cfg *ApiConfig) HandlerReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	if cfg.Platform != "dev" {
+		respondWithError(w, http.StatusForbidden, "Forbidden: Reset only allowed in development world!")
+		return
+	}
+
+	err := cfg.Db.DeleteUsers(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to reset database")
+		log.Print(err)
+		return
+	}
 
 	cfg.FileServerHits.Store(0)
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset back to 0"))
 }

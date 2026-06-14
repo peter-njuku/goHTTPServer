@@ -5,22 +5,27 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/peter-njuku/goHTTPServer/internal/database"
 )
 
 type chirpRequest struct {
-	Body string `json:"body"`
+	Body   string    `json:"body"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
-type chirpResponseValid struct {
-	Valid bool `json:"valid"`
+type chirpResponse struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
 type chirpResponseError struct {
 	Error string `json:"error"`
-}
-
-type chirpResponseCleaned struct {
-	CleanedBody string `json:"cleaned_body"`
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -59,7 +64,7 @@ func scrubProfanity(text string) (string, bool) {
 	return strings.Join(words, " "), censored
 }
 
-func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
@@ -70,7 +75,8 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	params := chirpRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Something went wrong")
+		respondWithError(w, http.StatusBadRequest, "Something went wrong decoding parameters")
+		log.Print(err)
 		return
 	}
 	if len(params.Body) > 140 {
@@ -78,9 +84,24 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if cleaned, censored := scrubProfanity(params.Body); censored {
-		respondWithJSON(w, http.StatusOK, chirpResponseCleaned{CleanedBody: cleaned})
+	cleaned, _ := scrubProfanity(params.Body)
+	dbChirp, err := cfg.Db.CreateChirps(r.Context(), database.CreateChirpsParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		Body:      cleaned,
+		UserID:    params.UserID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create new chirp")
+		log.Print(err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, chirpResponseValid{Valid: true})
+	respondWithJSON(w, http.StatusOK, chirpResponse{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		UserID:    dbChirp.UserID,
+	})
 }
