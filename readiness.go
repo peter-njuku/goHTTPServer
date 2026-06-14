@@ -1,10 +1,14 @@
 package main
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 func handlerReadiness(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
 		return
 	}
 

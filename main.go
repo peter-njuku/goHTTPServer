@@ -1,46 +1,38 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
-	"sync/atomic"
+	"os"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/peter-njuku/goHTTPServer/internal/config"
+	"github.com/peter-njuku/goHTTPServer/internal/database"
 )
 
-type apiConfig struct {
-	fileServerHits atomic.Int32
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileServerHits.Add(1)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-
-	w.WriteHeader(http.StatusOK)
-	s := fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", cfg.fileServerHits.Load())
-	w.Write([]byte(s))
-}
+const port = "8080"
+const filePathRoot = "."
 
 func main() {
-	const port = "8080"
-	const filePathRoot = "."
+	godotenv.Load()
+	dbUrl := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	dbQueries := database.New(db)
 
-	apiConfig := &apiConfig{}
+	apiConfig := config.ApiConfig{
+		Db: *dbQueries,
+	}
 
 	mux := http.NewServeMux()
 
 	//File Server endpoints
-	mux.Handle("/app/", apiConfig.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
+	mux.Handle("/app/", apiConfig.MiddlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(filePathRoot)))))
 	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("app/assets"))))
 
 	//Non-fileservers
@@ -48,8 +40,8 @@ func main() {
 	mux.HandleFunc("/api/validate_chirp", handlerValidateChirp)
 
 	//admin endpoints
-	mux.HandleFunc("/admin/metrics", apiConfig.handlerMetrics)
-	mux.HandleFunc("/admin/reset", apiConfig.handlerReset)
+	mux.HandleFunc("/admin/metrics", apiConfig.HandlerMetrics)
+	mux.HandleFunc("/admin/reset", apiConfig.HandlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
@@ -57,7 +49,7 @@ func main() {
 	}
 
 	log.Printf("Serving files from app on port %s\n", port)
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}

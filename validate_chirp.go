@@ -62,6 +62,8 @@ func scrubProfanity(text string) (string, bool) {
 func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
