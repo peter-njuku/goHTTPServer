@@ -39,7 +39,9 @@ func main() {
 
 	//Non-fileservers
 	mux.HandleFunc("/api/healthz", handlerReadiness)
-	mux.HandleFunc("/api/chirps", apiConfig.handlerValidateChirp)
+	mux.HandleFunc("POST /api/chirps", apiConfig.handlerValidateChirp)
+	mux.HandleFunc("GET /api/chirps", apiConfig.handlerChirpsRetrieve)
+	mux.HandleFunc("/api/chirps/{chirpID}", apiConfig.handlerChirpGet)
 	mux.HandleFunc("/api/users", apiConfig.HandlerCreateUser)
 
 	//admin endpoints

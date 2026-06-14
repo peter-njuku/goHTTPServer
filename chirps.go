@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -97,6 +99,69 @@ func (cfg *ApiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Reques
 		log.Print(err)
 		return
 	}
+	respondWithJSON(w, http.StatusOK, chirpResponse{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		UserID:    dbChirp.UserID,
+	})
+}
+
+func (cfg *ApiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dbChirps, err := cfg.Db.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not retrive all chirps")
+		log.Print(err)
+		return
+	}
+
+	chirps := []chirpResponse{}
+	for _, dbChirp := range dbChirps {
+		chirps = append(chirps, chirpResponse{
+			ID:        dbChirp.ID,
+			CreatedAt: dbChirp.CreatedAt,
+			UpdatedAt: dbChirp.UpdatedAt,
+			Body:      dbChirp.Body,
+			UserID:    dbChirp.UserID,
+		})
+	}
+	respondWithJSON(w, http.StatusOK, chirps)
+}
+
+func (cfg *ApiConfig) handlerChirpGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idString := r.PathValue("chirpID")
+	chirpID, err := uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Chirp-ID")
+		log.Print(err)
+		return
+	}
+
+	dbChirp, err := cfg.Db.RetriveOneChirp(r.Context(), chirpID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Chirp not found")
+			log.Print(err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirp")
+		log.Print(err)
+		return
+	}
+
 	respondWithJSON(w, http.StatusOK, chirpResponse{
 		ID:        dbChirp.ID,
 		CreatedAt: dbChirp.CreatedAt,
