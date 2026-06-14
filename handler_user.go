@@ -38,7 +38,10 @@ func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	dbUser, err := cfg.Db.CreateUser(r.Context(), database.CreateUserParams{
-		Email: params.Email,
+		ID:        uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		Email:     params.Email,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create a user")
