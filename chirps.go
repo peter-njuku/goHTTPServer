@@ -129,7 +129,23 @@ func (cfg *ApiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	dbChirps, err := cfg.Db.GetAllChirps(r.Context())
+	authorIDString := r.URL.Query().Get("author_id")
+
+	var dbChirps []database.Chirp
+	var err error
+
+	if authorIDString != "" {
+		authorId, parseErr := uuid.Parse(authorIDString)
+		if parseErr != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid author ID format")
+			return
+		}
+
+		dbChirps, err = cfg.Db.GetChirpsForAuthor(r.Context(), authorId)
+	} else {
+		dbChirps, err = cfg.Db.GetAllChirps(r.Context())
+	}
+
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not retrive all chirps")
 		log.Print(err)

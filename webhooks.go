@@ -26,6 +26,7 @@ func (cfg *ApiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request
 	providedKey, err := auth.GetAPIKey(r.Header)
 	if err != nil || providedKey != cfg.PolkaKey {
 		respondWithError(w, http.StatusUnauthorized, "Missing API Key")
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
