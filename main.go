@@ -46,6 +46,8 @@ func main() {
 	mux.HandleFunc("/api/chirps/{chirpID}", apiConfig.handlerChirpGet)
 	mux.HandleFunc("POST /api/users", apiConfig.HandlerCreateUser)
 	mux.HandleFunc("POST /api/login", apiConfig.handlerLogin)
+	mux.HandleFunc("POST /api/refresh", apiConfig.HandlerRefresh)
+	mux.HandleFunc("POST /api/revoke", apiConfig.HandlerRevoke)
 
 	//admin endpoints
 	mux.HandleFunc("/admin/metrics", apiConfig.HandlerMetrics)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,17 +13,17 @@ import (
 )
 
 type UserRequest struct {
-	Password         string `json:"password"`
-	Email            string `json:"email"`
-	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 type UserCreatedResponse struct {
-	Id        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	Id           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -110,33 +111,36 @@ func (cfg *ApiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defaultExpiry := time.Hour
-	maxExpiry := time.Hour
-	expirationDuration := defaultExpiry
-
-	if params.ExpiresInSeconds != nil {
-		requestDuration := time.Duration(*params.ExpiresInSeconds) * time.Second
-		if requestDuration > maxExpiry || requestDuration <= 0 {
-			expirationDuration = maxExpiry
-		} else {
-			expirationDuration = requestDuration
-		}
-	}
-
-	log.Print(expirationDuration)
-
-	tokenString, err := auth.MakeJWT(dbUser.ID, cfg.Secret, expirationDuration)
+	tokenString, err := auth.MakeJWT(dbUser.ID, cfg.Secret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not create access token")
 		log.Print(err)
 		return
 	}
 
+	refreshTokenString := auth.MakeRefreshToken()
+	currentTime := time.Now().UTC()
+
+	_, err = cfg.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshTokenString,
+		CreatedAt: currentTime,
+		UpdatedAt: currentTime,
+		UserID:    dbUser.ID,
+		ExpiresAt: currentTime.Add(60 * 24 * time.Hour),
+		RevokedAt: sql.NullTime{Valid: false},
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not save refresh token")
+		log.Print(err)
+		return
+	}
+
 	respondWithJSON(w, http.StatusOK, UserCreatedResponse{
-		Id:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
-		Token:     tokenString,
+		Id:           dbUser.ID,
+		CreatedAt:    dbUser.CreatedAt,
+		UpdatedAt:    dbUser.UpdatedAt,
+		Email:        dbUser.Email,
+		Token:        tokenString,
+		RefreshToken: refreshTokenString,
 	})
 }
