@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/peter-njuku/goHTTPServer/internal/auth"
 )
 
 type PolkaWebhookRequest struct {
@@ -22,11 +23,16 @@ func (cfg *ApiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	providedKey, err := auth.GetAPIKey(r.Header)
+	if err != nil || providedKey != cfg.PolkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Missing API Key")
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := PolkaWebhookRequest{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "SOmething went wrong decoding request")
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong decoding request")
 		log.Print(err)
 		return
 	}
