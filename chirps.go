@@ -184,3 +184,52 @@ func (cfg *ApiConfig) handlerChirpGet(w http.ResponseWriter, r *http.Request) {
 		UserID:    dbChirp.UserID,
 	})
 }
+
+func (cfg *ApiConfig) HandlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idString := r.PathValue("chirpID")
+	chirpId, err := uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Chirp Id")
+		log.Print(err)
+		return
+	}
+
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+	userId, err := auth.ValidateJWT(tokenString, cfg.Secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+
+	dbChirp, err := cfg.Db.RetriveOneChirp(r.Context(), chirpId)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Chirp not found")
+		log.Print(err)
+		return
+	}
+
+	if dbChirp.UserID != userId {
+		respondWithError(w, http.StatusForbidden, "You do not have permission to do the action")
+		return
+	}
+
+	err = cfg.Db.DeleteChirpById(r.Context(), chirpId)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not delete chirp")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
