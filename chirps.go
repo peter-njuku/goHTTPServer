@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -130,6 +131,7 @@ func (cfg *ApiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 	}
 
 	authorIDString := r.URL.Query().Get("author_id")
+	sortOrder := r.URL.Query().Get("sort")
 
 	var dbChirps []database.Chirp
 	var err error
@@ -160,6 +162,16 @@ func (cfg *ApiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 			UpdatedAt: dbChirp.UpdatedAt,
 			Body:      dbChirp.Body,
 			UserID:    dbChirp.UserID,
+		})
+	}
+
+	if sortOrder == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
+	} else {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
 		})
 	}
 	respondWithJSON(w, http.StatusOK, chirps)
