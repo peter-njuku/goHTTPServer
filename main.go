@@ -18,6 +18,7 @@ func main() {
 	godotenv.Load()
 	dbUrl := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	secret := os.Getenv("SECRET")
 
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -29,6 +30,7 @@ func main() {
 	apiConfig := ApiConfig{
 		Db:       *dbQueries,
 		Platform: platform,
+		Secret:   secret,
 	}
 
 	mux := http.NewServeMux()

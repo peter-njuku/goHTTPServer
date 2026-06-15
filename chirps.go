@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/peter-njuku/goHTTPServer/internal/auth"
 	"github.com/peter-njuku/goHTTPServer/internal/database"
 )
 
 type chirpRequest struct {
-	Body   string    `json:"body"`
-	UserID uuid.UUID `json:"user_id"`
+	Body string `json:"body"`
 }
 
 type chirpResponse struct {
@@ -73,9 +73,23 @@ func (cfg *ApiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(tokenString, cfg.Secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := chirpRequest{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Something went wrong decoding parameters")
 		log.Print(err)
@@ -92,7 +106,7 @@ func (cfg *ApiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Reques
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		Body:      cleaned,
-		UserID:    params.UserID,
+		UserID:    userId,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create new chirp")

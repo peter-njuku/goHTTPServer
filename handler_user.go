@@ -12,8 +12,9 @@ import (
 )
 
 type UserRequest struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Password         string `json:"password"`
+	Email            string `json:"email"`
+	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
 }
 
 type UserCreatedResponse struct {
@@ -21,6 +22,7 @@ type UserCreatedResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Token     string    `json:"token"`
 }
 
 func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -100,11 +102,33 @@ func (cfg *ApiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	match, err := auth.CheckPasswordHash(params.Password, dbUser.HashedPassword)
-	if err != nil{
+	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error checking password")
 	}
 	if !match {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
+		return
+	}
+
+	defaultExpiry := time.Hour
+	maxExpiry := time.Hour
+	expirationDuration := defaultExpiry
+
+	if params.ExpiresInSeconds != nil {
+		requestDuration := time.Duration(*params.ExpiresInSeconds) * time.Second
+		if requestDuration > maxExpiry || requestDuration <= 0 {
+			expirationDuration = maxExpiry
+		} else {
+			expirationDuration = requestDuration
+		}
+	}
+
+	log.Print(expirationDuration)
+
+	tokenString, err := auth.MakeJWT(dbUser.ID, cfg.Secret, expirationDuration)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not create access token")
+		log.Print(err)
 		return
 	}
 
@@ -113,5 +137,6 @@ func (cfg *ApiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: dbUser.CreatedAt,
 		UpdatedAt: dbUser.UpdatedAt,
 		Email:     dbUser.Email,
+		Token:     tokenString,
 	})
 }
