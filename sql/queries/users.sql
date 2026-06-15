@@ -15,3 +15,11 @@ WHERE email=$1;
 
 -- name: DeleteUsers :exec
 DELETE FROM users;
+
+-- name: UpdateUserEmailAndPassword :one
+UPDATE users
+SET email = $2,
+    hashed_password= $3,
+    updated_at = $4
+WHERE id = $1
+RETURNING *;

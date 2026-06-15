@@ -26,6 +26,13 @@ type UserCreatedResponse struct {
 	RefreshToken string    `json:"refresh_token"`
 }
 
+type UserUpdatedResponse struct {
+	Id        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
 func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -142,5 +149,67 @@ func (cfg *ApiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		Email:        dbUser.Email,
 		Token:        tokenString,
 		RefreshToken: refreshTokenString,
+	})
+}
+
+func (cfg *ApiConfig) HandlerUpdateUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("OOOPS! Wrong API method - %d\n", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(tokenString, cfg.Secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		log.Print(err)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := UserRequest{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not decode request")
+		log.Print(err)
+		return
+	}
+
+	if params.Email == "" || params.Password == "" {
+		respondWithError(w, http.StatusBadRequest, "Both Password and Email are required")
+		log.Print(err)
+		return
+	}
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't secure new password")
+		log.Print(err)
+		return
+	}
+
+	updatedUser, err := cfg.Db.UpdateUserEmailAndPassword(r.Context(), database.UpdateUserEmailAndPasswordParams{
+		ID:             userId,
+		Email:          params.Email,
+		HashedPassword: hashedPassword,
+		UpdatedAt:      time.Now().UTC(),
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not update user")
+		log.Print(err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, UserUpdatedResponse{
+		Id:        updatedUser.ID,
+		CreatedAt: updatedUser.CreatedAt,
+		UpdatedAt: updatedUser.UpdatedAt,
+		Email:     updatedUser.Email,
 	})
 }
